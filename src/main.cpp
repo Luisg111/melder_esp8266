@@ -23,14 +23,17 @@
 #define R_2AN 2797393408
 #define R_2AUS 2931611136
 
-#define alarmTime 250
 #define LichtAusZeit 300000
+
+const uint16_t scanDelay = 100;
+const uint16_t scanTimes = 5;
 
 uint32_t LichtTimer = 0;
 uint32_t alarmMillis = 0;
 
 boolean LichtAn = false;
 boolean alarmAktiv = false;
+boolean alarmAktivAlt = false;
 uint8_t SteckerTimer = 0;
 boolean GarageZu = true;
 
@@ -48,7 +51,6 @@ void Alarm()
 {
   LichtAn = true;
   LichtTimer = millis();
-  alarmAktiv = true;
   VentMessage(V_AN);
   RC.send(R_1AN, 32);
   RC.send(R_2AN, 32);
@@ -57,7 +59,6 @@ void Alarm()
 
 void Quittiert()
 {
-  alarmAktiv = false;
   Serial.print("ENDE\n");
 }
 
@@ -122,6 +123,13 @@ void setup()
 
   // Serielle Schnittstelle einrichten
   Serial.begin(115200, SERIAL_8E1);
+
+  alarmAktivAlt = alarmAktiv;
+}
+
+void checkAlarm()
+{
+  alarmAktiv = digitalRead(melderPin) == LOW;
 }
 
 void loop()
@@ -131,19 +139,39 @@ void loop()
     LichtAus();
   }
 
-  if (digitalRead(melderPin) == LOW && !alarmAktiv)
+  for (int i = 0; i < scanTimes; i++)
   {
-    delay(10);
-    if (digitalRead(melderPin) == LOW && !alarmAktiv)
-      Alarm();
+    delay(scanDelay);
+    checkAlarm();
+    if ((alarmAktiv == alarmAktivAlt))
+    {
+      break;
+    }
+    if (i < scanTimes - 1)
+    {
+      if (alarmAktiv)
+        Alarm();
+      else
+        Quittiert();
+
+      alarmAktivAlt = alarmAktiv;
+    }
   }
 
-  if (digitalRead(melderPin) == HIGH && alarmAktiv)
+  /*if ((alarmAktiv ^ alarmAktivAlt))
   {
-    delay(10);
-    if (digitalRead(melderPin) == HIGH && alarmAktiv)
-      Quittiert();
-  }
+    delay(scanDelay);
+    checkAlarm();
+    if ((alarmAktiv ^ alarmAktivAlt))
+    {
+      if (alarmAktiv)
+        Alarm();
+      else
+        Quittiert();
+
+      alarmAktivAlt = alarmAktiv;
+    }
+  }*/
 
   digitalWrite(alarmLED, !GarageZu);
   manageSerial();
